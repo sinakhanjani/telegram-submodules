@@ -1,0 +1,98 @@
+load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
+
+# --- Core layers ---
+swift_library(
+    name = "HonistFoundation",
+    module_name = "HonistFoundation",
+    srcs = glob(["Sources/HonistFoundation/**/*.swift"]),
+    visibility = ["//visibility:public"],
+)
+
+swift_library(
+    name = "HonistModels",
+    module_name = "HonistModels",
+    srcs = glob(["Sources/HonistModels/**/*.swift"]),
+    deps = [":HonistFoundation"],
+    visibility = ["//visibility:public"],
+)
+
+swift_library(
+    name = "HonistNetworking",
+    module_name = "HonistNetworking",
+    srcs = glob(["Sources/HonistNetworking/**/*.swift"]),
+    deps = [
+        ":HonistFoundation",
+        ":HonistModels",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+swift_library(
+    name = "HonistStorage",
+    module_name = "HonistStorage",
+    srcs = glob(["Sources/HonistStorage/**/*.swift"]),
+    deps = [":HonistFoundation"],
+    visibility = ["//visibility:public"],
+)
+
+swift_library(
+    name = "HonistUIComponents",
+    module_name = "HonistUIComponents",
+    srcs = glob(["Sources/HonistUIComponents/**/*.swift"]),
+    deps = [
+        ":HonistFoundation",
+        ":HonistDesignSystem",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+swift_library(
+    name = "HonistDesignSystem",
+    module_name = "HonistDesignSystem",
+    srcs = glob(["Sources/HonistDesignSystem/**/*.swift"]),
+    deps = [":HonistFoundation"],
+    visibility = ["//visibility:public"],
+)
+
+swift_library(
+    name = "HonistRouting",
+    module_name = "HonistRouting",
+    srcs = glob(["Sources/HonistRouting/**/*.swift"]),
+    deps = [":HonistFoundation"],
+    visibility = ["//visibility:public"],
+)
+
+# --- Services ---
+swift_library(
+    name = "HonistService_Profile",
+    module_name = "HonistService_Profile",
+    srcs = glob(["Sources/Services/Profile/**/*.swift"]),
+    deps = [
+        ":HonistFoundation",
+        ":HonistModels",
+        ":HonistNetworking",
+        ":HonistStorage",
+        ":HonistUIComponents",
+        ":HonistDesignSystem",
+        ":HonistRouting",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# --- Umbrella
+swift_library(
+    name = "HonistKit",
+    module_name = "HonistKit",
+    srcs = ["Sources/Umbrella/HonistKit.swift"],
+    deps = [
+        ":HonistFoundation",
+        ":HonistModels",
+        ":HonistNetworking",
+        ":HonistStorage",
+        ":HonistUIComponents",
+        ":HonistDesignSystem",
+        ":HonistRouting",
+        ":HonistService_Profile",
+    ],
+    visibility = ["//visibility:public"],
+)
