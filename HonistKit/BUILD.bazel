@@ -36,6 +36,19 @@ swift_library(
 )
 
 swift_library(
+    name = "HonistCore",
+    module_name = "HonistCore",
+    srcs = glob(["Sources/HonistCore/**/*.swift"]),
+    deps = [
+        ":HonistFoundation",
+        ":HonistNetworking",
+        ":HonistStorage",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+
+swift_library(
     name = "HonistUIComponents",
     module_name = "HonistUIComponents",
     srcs = glob(["Sources/HonistUIComponents/**/*.swift"]),
@@ -64,6 +77,23 @@ swift_library(
 
 # --- Services ---
 swift_library(
+    name = "HonistService_Auth",
+    module_name = "HonistService_Auth",
+    srcs = glob(["Sources/Services/Auth/**/*.swift"]),
+    deps = [
+        ":HonistFoundation",
+        ":HonistModels",
+        ":HonistNetworking",
+        ":HonistStorage",
+        ":HonistCore",
+        ":HonistUIComponents",
+        ":HonistDesignSystem",
+        ":HonistRouting",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+swift_library(
     name = "HonistService_Profile",
     module_name = "HonistService_Profile",
     srcs = glob(["Sources/Services/Profile/**/*.swift"]),
@@ -72,6 +102,24 @@ swift_library(
         ":HonistModels",
         ":HonistNetworking",
         ":HonistStorage",
+        ":HonistCore",
+        ":HonistUIComponents",
+        ":HonistDesignSystem",
+        ":HonistRouting",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+swift_library(
+    name = "HonistService_Payments",
+    module_name = "HonistService_Payments",
+    srcs = glob(["Sources/Services/Payments/**/*.swift"]),
+    deps = [
+        ":HonistFoundation",
+        ":HonistModels",
+        ":HonistNetworking",
+        ":HonistStorage",
+        ":HonistCore",
         ":HonistUIComponents",
         ":HonistDesignSystem",
         ":HonistRouting",
@@ -89,10 +137,13 @@ swift_library(
         ":HonistModels",
         ":HonistNetworking",
         ":HonistStorage",
+        ":HonistCore",
         ":HonistUIComponents",
         ":HonistDesignSystem",
         ":HonistRouting",
         ":HonistService_Profile",
+        ":HonistService_Payments",
+        ":HonistService_Auth",
     ],
     visibility = ["//visibility:public"],
 )

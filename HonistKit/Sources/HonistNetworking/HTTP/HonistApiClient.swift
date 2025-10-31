@@ -1,6 +1,6 @@
 import Foundation
-import HonistFoundation
-import HonistModels
+import HonistFoundation   // For AppEnvironment, HonistError, TokenRefresher, AuthTokenProvider
+import HonistModels       // For ApiEnvelope, ListPayload, EmptyDTO
 
 // MARK: - HTTP Method
 
@@ -15,6 +15,7 @@ public protocol RootDecodesItself {}
 extension ListPayload: RootDecodesItself {}
 
 public final class HonistApiClient {
+    // MARK: - Core dependencies
     public let baseURL: URL
     private let session: URLSession
     private let tokenProvider: AuthTokenProvider?
@@ -22,15 +23,25 @@ public final class HonistApiClient {
     private let jsonDecoder: JSONDecoder
     private let jsonEncoder: JSONEncoder
 
+    // MARK: - Token lifecycle helper (optional)
+    // If provided, will be used to:
+    // 1) eagerly refresh tokens before protected requests,
+    // 2) attempt a one-time refresh and retry the request on 401.
+    private let tokenRefresher: TokenRefresher?
+
+    // MARK: - Init
+
     public init(
         baseURL: URL = URL(string: AppEnvironment.baseURLString)!,
         tokenProvider: AuthTokenProvider? = nil,
         options: HonistApiClientOptions = .init(),
-        session: URLSession? = nil
+        session: URLSession? = nil,
+        tokenRefresher: TokenRefresher? = nil
     ) {
         self.baseURL = baseURL
         self.tokenProvider = tokenProvider
         self.options = options
+        self.tokenRefresher = tokenRefresher
 
         // Build URLSession
         let config = (session?.configuration ?? URLSessionConfiguration.default)
@@ -42,15 +53,14 @@ public final class HonistApiClient {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         decoder.dateDecodingStrategy = .custom { decoder -> Date in
+            // NOTE: We decode ISO-8601 both with and without fractional seconds
             let container = try decoder.singleValueContainer()
             let s = try container.decode(String.self)
 
-            // Try with fractional seconds
             let ffs = ISO8601DateFormatter()
             ffs.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             if let d = ffs.date(from: s) { return d }
 
-            // Fallback without fractional seconds
             let f = ISO8601DateFormatter()
             f.formatOptions = [.withInternetDateTime]
             if let d = f.date(from: s) { return d }
@@ -81,7 +91,7 @@ public final class HonistApiClient {
 
     /// GET helper for list endpoints that may return mixed shapes
     /// (e.g., data: [Item] with or without pagination at root, or data: { pagination, items })
-    /// Uses `ListPayload<Item>` which knows how to decode itself.ا
+    /// Uses `ListPayload<Item>` which knows how to decode itself.
     public func getList<Item: Decodable>(
         _ path: String,
         query: [String: CustomStringConvertible]? = nil,
@@ -155,10 +165,12 @@ public final class HonistApiClient {
     }
 
     /// Core request runner:
+    /// - Eagerly refreshes token (if needed) via `TokenRefresher`
     /// - Builds URL + query
     /// - Adds headers (including Authorization)
     /// - Encodes body (JSON/raw)
     /// - Executes request
+    /// - On 401, tries a one-time refresh + retry (if `TokenRefresher` provided)
     /// - Decodes response either as:
     ///   a) RootDecodesItself (e.g., ListPayload), or
     ///   b) ApiEnvelope<T> (success/data/message), with fallback to direct T
@@ -169,6 +181,13 @@ public final class HonistApiClient {
         body: BodyPayload = .none,
         headers: [String: String] = [:]
     ) async throws -> T {
+
+        // --- Eager refresh before protected requests (if refresher exists) ---
+        if let refresher = tokenRefresher {
+            // If this throws (e.g., no refresh token), we propagate the error.
+            try await refresher.ensureValidAccessTokenIfNeeded()
+        }
+
         // Resolve URL + query
         guard var url = URL(string: path, relativeTo: baseURL) else {
             throw HonistError.invalidURL(path)
@@ -214,67 +233,35 @@ public final class HonistApiClient {
 
         if options.debugLogging { logRequest(req) }
 
-        // Execute request
+        // Execute request with at most one retry on 401 if we have a refresher
         do {
             let (data, resp) = try await session.data(for: req)
             guard let http = resp as? HTTPURLResponse else {
                 throw HonistError.network(status: -1, message: "No HTTPURLResponse")
             }
 
-            if options.debugLogging { logResponse(http, data: data) }
-
-            // 401 → unauthorized with optional server message
-            if http.statusCode == 401 {
-                if let env: ApiEnvelope<EmptyDTO> = try? jsonDecoder.decode(ApiEnvelope<EmptyDTO>.self, from: data),
-                   let msg = env.message {
-                    throw HonistError.network(status: http.statusCode, message: msg)
+            // If 401 and refresher exists → try refresh + retry once
+            if http.statusCode == 401, let refresher = tokenRefresher {
+                // Try a refresh now (may throw). If returns true, we retry the same request once.
+                let shouldRetry = try await refresher.refreshAfterUnauthorized()
+                if shouldRetry {
+                    // Rebuild Authorization header with updated access token:
+                    var retryReq = req
+                    if let newToken = tokenProvider?.accessToken, !newToken.isEmpty {
+                        retryReq.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+                    }
+                    if options.debugLogging { print("🔁 Retrying after refresh: \(retryReq.url?.absoluteString ?? "")") }
+                    let (retryData, retryResp) = try await session.data(for: retryReq)
+                    guard let retryHttp = retryResp as? HTTPURLResponse else {
+                        throw HonistError.network(status: -1, message: "No HTTPURLResponse (retry)")
+                    }
+                    return try decodeResponse(retryHttp, data: retryData)
                 }
-                throw HonistError.unauthorized
+                // If refresh not possible, fall through to normal 401 handling
             }
 
-            // Non-2xx → try to surface server envelope message
-            guard (200..<300).contains(http.statusCode) else {
-                if let env = try? jsonDecoder.decode(ApiEnvelope<EmptyDTO>.self, from: data) {
-                    throw HonistError.network(status: http.statusCode, message: env.message)
-                }
-                throw HonistError.network(status: http.statusCode, message: String(data: data, encoding: .utf8))
-            }
+            return try decodeResponse(http, data: data)
 
-            // Decoding strategy:
-            // 1) If T conforms to RootDecodesItself (e.g., ListPayload), decode T directly from the root.
-            // 2) Otherwise try ApiEnvelope<T>, then fallback to decoding T directly.
-            if T.self is RootDecodesItself.Type {
-                return try jsonDecoder.decode(T.self, from: data)
-            }
-
-            // Try envelope first
-            do {
-                let env = try jsonDecoder.decode(ApiEnvelope<T>.self, from: data)
-
-                // success must be true
-                guard env.success else {
-                    throw HonistError.server(message: env.message)
-                }
-
-                // T == EmptyDTO and no data → fabricate an empty payload
-                if T.self == EmptyDTO.self, env.data == nil {
-                    return EmptyDTO() as! T
-                }
-
-                // Ensure we have data
-                guard let payload = env.data else {
-                    if T.self == EmptyDTO.self { return EmptyDTO() as! T }
-                    throw HonistError.decoding("Missing `data` in envelope")
-                }
-
-                return payload
-            } catch {
-                // Fallback: some endpoints might return raw `T` without envelope
-                if let direct = try? jsonDecoder.decode(T.self, from: data) {
-                    return direct
-                }
-                throw HonistError.decoding(error.localizedDescription)
-            }
         } catch is CancellationError {
             throw HonistError.cancelled
         } catch {
@@ -282,7 +269,70 @@ public final class HonistApiClient {
         }
     }
 
-    // Encodable-erasure to allow passing `Encodable` as body payload
+    // MARK: - Decode helper for initial or retried responses
+
+    /// Decodes the response using the client decoder rules.
+    /// - Throws proper `HonistError` for non-2xx codes.
+    private func decodeResponse<T: Decodable>(_ http: HTTPURLResponse, data: Data) throws -> T {
+        if options.debugLogging { logResponse(http, data: data) }
+
+        // 401 → unauthorized (the refresh path is handled in request(); here we just bubble up)
+        if http.statusCode == 401 {
+            // Try to surface server message if envelope-like:
+            if let env: ApiEnvelope<EmptyDTO> = try? jsonDecoder.decode(ApiEnvelope<EmptyDTO>.self, from: data),
+               let msg = env.message {
+                throw HonistError.network(status: http.statusCode, message: msg)
+            }
+            throw HonistError.unauthorized
+        }
+
+        // Non-2xx → try to surface server envelope message
+        guard (200..<300).contains(http.statusCode) else {
+            if let env = try? jsonDecoder.decode(ApiEnvelope<EmptyDTO>.self, from: data) {
+                throw HonistError.network(status: http.statusCode, message: env.message)
+            }
+            throw HonistError.network(status: http.statusCode, message: String(data: data, encoding: .utf8))
+        }
+
+        // Decoding strategy:
+        // 1) If T conforms to RootDecodesItself (e.g., ListPayload), decode T directly from the root.
+        // 2) Otherwise try ApiEnvelope<T>, then fallback to decoding T directly.
+        if T.self is RootDecodesItself.Type {
+            return try jsonDecoder.decode(T.self, from: data)
+        }
+
+        do {
+            let env = try jsonDecoder.decode(ApiEnvelope<T>.self, from: data)
+
+            // success must be true
+            guard env.success else {
+                throw HonistError.server(message: env.message)
+            }
+
+            // T == EmptyDTO and no data → fabricate an empty payload
+            if T.self == EmptyDTO.self, env.data == nil {
+                return EmptyDTO() as! T
+            }
+
+            // Ensure we have data
+            guard let payload = env.data else {
+                if T.self == EmptyDTO.self { return EmptyDTO() as! T }
+                throw HonistError.decoding("Missing `data` in envelope")
+            }
+
+            return payload
+        } catch {
+            // Fallback: some endpoints might return raw `T` without envelope
+            if let direct = try? jsonDecoder.decode(T.self, from: data) {
+                return direct
+            }
+            throw HonistError.decoding(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Encodable erasure
+
+    /// Encodable-erasure to allow passing `Encodable` as body payload
     private func encodeAny(_ value: Encodable) throws -> Data {
         let box = AnyEncodable(value)
         return try jsonEncoder.encode(box)
