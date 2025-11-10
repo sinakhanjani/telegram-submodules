@@ -118,6 +118,8 @@ swift_library(
         "//submodules/TelegramUI/Components/ButtonComponent",
         "//submodules/TelegramUI/Components/AnimatedTextComponent",
         "//submodules/TelegramUI/Components/EdgeEffect",
+        "//submodules/HonistKit:HonistService_Auth",
+        "//submodules/HonistKit:HonistService_Profile",
     ],
     visibility = [
         "//visibility:public",

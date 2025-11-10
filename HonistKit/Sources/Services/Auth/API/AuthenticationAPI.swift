@@ -45,21 +45,21 @@ public struct AuthenticationAPI {
     /// POST /app/auth/login
     public func login(_ body: LoginRequest) async throws -> AuthResultDTO {
         let headers = try hmacHeader(for: body)
-        return try await client.post("/app/auth/login", body: body, headers: headers)
+        return try await client.post("/api/v1/app/auth/login", body: body, headers: headers)
     }
 
     /// POST /app/auth/refresh
     public func refresh(_ refreshToken: String) async throws -> TokenPairDTO {
         let body = RefreshRequest(refreshToken: refreshToken)
         let headers = try hmacHeader(for: body)
-        return try await client.post("/app/auth/refresh", body: body, headers: headers)
+        return try await client.post("/api/v1/app/auth/refresh", body: body, headers: headers)
     }
 
     /// POST /app/auth/logout (current session)
     public func logoutCurrent(refreshToken: String) async throws -> EmptyDTO {
         let body = LogoutRequest(refreshToken: refreshToken)
         let headers = try hmacHeader(for: body)
-        return try await client.post("/app/auth/logout", body: body, headers: headers)
+        return try await client.post("/api/v1/app/auth/logout", body: body, headers: headers)
     }
 
     /// POST /app/auth/logout-all (Bearer required, empty body)
@@ -67,12 +67,12 @@ public struct AuthenticationAPI {
         let headers = try hmacHeader(for: Optional<String>.none) // empty body
         // Empty body → send EmptyDTO() so Content-Type remains JSON, or switch to DELETE if server supports
         struct EmptyBody: Encodable {}
-        return try await client.post("/app/auth/logout-all", body: EmptyBody(), headers: headers)
+        return try await client.post("/api/v1/app/auth/logout-all", body: EmptyBody(), headers: headers)
     }
 
     /// GET /app/auth/me (Bearer required)
     public func me() async throws -> UserDTO {
         let headers = try hmacHeader(for: Optional<String>.none) // empty body
-        return try await client.get("/app/auth/me", headers: headers)
+        return try await client.get("/api/v1/app/auth/me", headers: headers)
     }
 }

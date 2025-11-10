@@ -84,7 +84,6 @@ public extension TelegramEngine {
         
         public func terminateAnotherSession(id: Int64) -> Signal<Never, TerminateSessionError> {
             let _ = removeNewSessionReviews(postbox: self.account.postbox, ids: [id]).start()
-            
             return terminateAccountSession(account: self.account, hash: id)
             |> ignoreValues
         }

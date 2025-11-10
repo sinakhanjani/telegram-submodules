@@ -27,7 +27,7 @@ swift_library(
         "//submodules/TelegramUI/Components/MultiAnimationRenderer:MultiAnimationRenderer",
         "//submodules/TelegramCore/FlatBuffers",
         "//submodules/TelegramCore/FlatSerialization",
-        "//submodules/HonistKit:HonistKit",
+        "//submodules/HonistKit:HonistService_Auth",
     ],
     visibility = [
         "//visibility:public",

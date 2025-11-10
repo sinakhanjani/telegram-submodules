@@ -56,6 +56,9 @@ import AvatarUploadToastScreen
 import AdsInfoScreen
 import AdsReportScreen
 
+import HonistService_Auth
+import HonistService_Profile
+
 private final class ContextControllerContentSourceImpl: ContextControllerContentSource {
     let controller: ViewController
     weak var sourceNode: ASDisplayNode?
@@ -218,6 +221,8 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
     var currentTooltipUpdateTimer: Foundation.Timer?
     
     private var fullScreenEffectView: RippleEffectView?
+    
+    private var didShowReferralPopup = false
     
     public override func updateNavigationCustomData(_ data: Any?, progress: CGFloat, transition: ContainedViewLayoutTransition) {
         if self.isNodeLoaded {
@@ -2359,7 +2364,28 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
     
     override public func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-                
+        // ⚠️ Ensure popup is shown only once
+        if !self.didShowReferralPopup {
+            self.didShowReferralPopup = true
+            
+            Task {
+                do {
+                    let user = try await AuthAppServices.shared.authLogic.meWithAutoRefresh()
+                    // English comment: Present your custom modal
+                    if let appStatus = user.appStatus, appStatus.appLaunchCount == 1 {
+                        ReferralCodeFeature.present(over: self)
+                    }
+                    #if DEBUG
+                    print("[Auth] Honist meWithAutoRefresh succeeded fetch in ChatListControllerImpl appStatus: \(String(describing: user.appStatus))")
+                    #endif
+                } catch {
+                    #if DEBUG
+                    print("[Auth] Honist login failed: \(error)")
+                    #endif
+                }
+            }
+        }
+        
         if self.powerSavingMonitoringDisposable == nil {
             self.powerSavingMonitoringDisposable = (self.context.sharedContext.automaticMediaDownloadSettings
             |> mapToSignal { settings -> Signal<Bool, NoError> in

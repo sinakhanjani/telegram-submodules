@@ -492,6 +492,9 @@ swift_library(
         "//submodules/TelegramUI/Components/Chat/ChatInputMessageAccessoryPanel",
         "//submodules/TelegramUI/Components/Chat/ChatRecordingViewOnceButtonNode",
         "//submodules/TelegramUI/Components/EdgeEffect",
+        "//submodules/HonistKit:HonistService_Auth",
+        "//submodules/HonistKit:HonistService_Profile",
+        "//submodules/HonistIntegration:HonistTelegramBridge",
     ] + select({
         "@build_bazel_rules_apple//apple:ios_arm64": appcenter_targets,
         "//build-system:ios_sim_arm64": [],

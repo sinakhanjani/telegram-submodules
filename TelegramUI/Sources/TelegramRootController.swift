@@ -33,6 +33,8 @@ import ShareWithPeersScreen
 import ChatEmptyNode
 import UndoUI
 
+import HonistTelegramBridge
+
 private class DetailsChatPlaceholderNode: ASDisplayNode, NavigationDetailsPlaceholderNode {
     private var presentationData: PresentationData
     private var presentationInterfaceState: ChatPresentationInterfaceState
@@ -218,6 +220,9 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             sharedContext.switchingData = (nil, nil, nil)
         }
         
+        let honistHome = HonistAiHomeViewController.init(context: self.context)
+        controllers.append(honistHome)
+        
         let accountSettingsController = PeerInfoScreenImpl(context: self.context, updatedPresentationData: nil, peerId: self.context.account.peerId, avatarInitiallyExpanded: false, isOpenedFromChat: false, nearbyPeerDistance: nil, reactionSourceMessageId: nil, callMessages: [], isSettings: true)
         accountSettingsController.tabBarItemDebugTapAction = { [weak self] in
             guard let strongSelf = self else {
@@ -228,7 +233,10 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         accountSettingsController.parentController = self
         controllers.append(accountSettingsController)
                 
-        tabBarController.setControllers(controllers, selectedIndex: restoreSettignsController != nil ? (controllers.count - 1) : (controllers.count - 2))
+        tabBarController.setControllers(
+            controllers,
+            selectedIndex: restoreSettignsController != nil ? (controllers.count - 1) : (controllers.count - 3)
+        )
         
         self.contactsController = contactsController
         self.callListController = callListController

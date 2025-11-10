@@ -1,6 +1,9 @@
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 
-# --- Core layers ---
+# ======================================================
+# 🧱 HonistKit Core Layers
+# ======================================================
+
 swift_library(
     name = "HonistFoundation",
     module_name = "HonistFoundation",
@@ -47,6 +50,17 @@ swift_library(
     visibility = ["//visibility:public"],
 )
 
+# ======================================================
+# 🎨 UI + Design Layers
+# ======================================================
+
+swift_library(
+    name = "HonistDesignSystem",
+    module_name = "HonistDesignSystem",
+    srcs = glob(["Sources/HonistDesignSystem/**/*.swift"]),
+    deps = [":HonistFoundation"],
+    visibility = ["//visibility:public"],
+)
 
 swift_library(
     name = "HonistUIComponents",
@@ -60,14 +74,6 @@ swift_library(
 )
 
 swift_library(
-    name = "HonistDesignSystem",
-    module_name = "HonistDesignSystem",
-    srcs = glob(["Sources/HonistDesignSystem/**/*.swift"]),
-    deps = [":HonistFoundation"],
-    visibility = ["//visibility:public"],
-)
-
-swift_library(
     name = "HonistRouting",
     module_name = "HonistRouting",
     srcs = glob(["Sources/HonistRouting/**/*.swift"]),
@@ -75,7 +81,10 @@ swift_library(
     visibility = ["//visibility:public"],
 )
 
-# --- Services ---
+# ======================================================
+# 🔐 Services Layer
+# ======================================================
+
 swift_library(
     name = "HonistService_Auth",
     module_name = "HonistService_Auth",
@@ -106,6 +115,7 @@ swift_library(
         ":HonistUIComponents",
         ":HonistDesignSystem",
         ":HonistRouting",
+        ":HonistService_Auth",
     ],
     visibility = ["//visibility:public"],
 )
@@ -127,7 +137,10 @@ swift_library(
     visibility = ["//visibility:public"],
 )
 
-# --- Umbrella
+# ======================================================
+# 🧩 Umbrella Module
+# ======================================================
+
 swift_library(
     name = "HonistKit",
     module_name = "HonistKit",
@@ -141,9 +154,9 @@ swift_library(
         ":HonistUIComponents",
         ":HonistDesignSystem",
         ":HonistRouting",
+        ":HonistService_Auth",
         ":HonistService_Profile",
         ":HonistService_Payments",
-        ":HonistService_Auth",
     ],
     visibility = ["//visibility:public"],
 )

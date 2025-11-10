@@ -43,6 +43,9 @@ import ContextMenuScreen
 import MetalEngine
 import RecaptchaEnterprise
 
+import HonistService_Auth
+import HonistService_Profile
+
 #if canImport(AppCenter)
 import AppCenter
 import AppCenterCrashes
@@ -320,6 +323,30 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         precondition(!testIsLaunched)
         testIsLaunched = true
+        
+        // Attempt to load the last cached user from local storage into memory.
+        // If a cached user exists, try to refresh it from the server (handles token refresh if needed).
+        Task { @MainActor in
+            do {
+                _ = await AuthAppServices.shared.authLogic.loadCachedUser()
+                if AuthAppServices.shared.authLogic.currentUser != nil {
+                    if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                        print("📱 App version:", version)
+                        try await ProfileLogic().updateAppStatus(
+                            incrementLaunch: true,
+                            touchLaunch: true,
+                            lastAppVersion: version,
+                            countryIso: "-"
+                        )
+                    }
+                    
+                    let _ = try await AuthAppServices.shared.authLogic.meWithAutoRefresh()
+                }
+            } catch {
+                // Safely log or handle any errors from the /me refresh (e.g., network issues, unauthorized)
+                Logger.shared.log("App \(self.episodeId)", "Auth bootstrap failed: \(error)")
+            }
+        }
         
         let _ = voipTokenPromise.get().start(next: { token in
             self.voipDeviceToken.set(.single(token))

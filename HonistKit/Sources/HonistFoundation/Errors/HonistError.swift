@@ -13,7 +13,7 @@ public enum HonistError: Error, LocalizedError, Equatable {
         switch self {
         case .invalidURL(let s): return "Invalid URL: \(s)"
         case .unauthorized: return "Unauthorized"
-        case .network(let status, let msg): return "Network error (\(status)): \(msg ?? "—")"
+        case .network(let status, let msg): return "\(msg ?? "—")"
         case .decoding(let msg): return "Decoding error: \(msg)"
         case .server(let msg): return "Server error: \(msg ?? "—")"
         case .upload(let msg): return "Upload error: \(msg)"
