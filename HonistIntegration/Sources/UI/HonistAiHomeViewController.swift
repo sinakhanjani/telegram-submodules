@@ -59,7 +59,7 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
             self?.showInfoAlert(title: "Premium", message: "Upgrade flow will be implemented later.")
         }
         
-        rootView.onProfileMenuTapped = { [weak self] in
+        rootView.onProfileNameTapped = { [weak self] in
             guard let self = self else { return }
             let user = AuthAppServices.shared.authLogic.currentUser
             
