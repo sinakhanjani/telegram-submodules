@@ -96,7 +96,7 @@ final class GemsHeaderView: UIView {
         descriptionLabel.textColor = .secondaryLabel
         descriptionLabel.font = .systemFont(ofSize: 13, weight: .regular)
         descriptionLabel.text =
-        "Gems are the virtual currency of Nicegram, enabling you to interact with AI chatbots, use the image generator, or convert them into cryptocurrency; it's where your social engagement meets tangible rewards!"
+        "Gems are the virtual currency of HonistAi, enabling you to interact with AI chatbots, use the image generator, or convert them into cryptocurrency; it's where your social engagement meets tangible rewards!"
         
         // Prefer text to compress horizontally if needed
         [titleLabel, descriptionLabel, sectionTitleLabel].forEach { label in

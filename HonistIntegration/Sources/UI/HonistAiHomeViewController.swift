@@ -4,6 +4,9 @@ import AsyncDisplayKit
 import TelegramPresentationData
 import AccountContext
 import HonistKit
+import TelegramCore
+import Postbox
+import SwiftSignalKit
 
 public final class HonistAiHomeViewController: HonistBaseViewController {
     
@@ -27,7 +30,7 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
         
         // Tab bar is configured only here (not in the base)
         self.tabBarItem.title = "HonistAi"
-        let icon = UIImage(bundleImageName: "Chat List/Tabs/IconChats")!
+        let icon = UIImage.init(named: "tab_honistai_icon")!
         self.tabBarItem.image = icon
         self.tabBarItem.selectedImage = icon
     }
@@ -56,16 +59,21 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
             self?.showInfoAlert(title: "Premium", message: "Upgrade flow will be implemented later.")
         }
         
-        rootView.onProfileNameTapped = { [weak self] in
+        rootView.onProfileMenuTapped = { [weak self] in
             guard let self = self else { return }
             let user = AuthAppServices.shared.authLogic.currentUser
+            
             ProfileNameEditFeature.present(
                 over: self,
                 firstName: user?.firstName,
-                lastName: user?.lastName
+                lastName: user?.lastName,
+                onUpdated: { [weak self] updatedUser in
+                    guard let self = self else { return }
+                    self.rootView.configure(with: updatedUser)
+                    self.updateGemCount(updatedUser.currentGemBalance)
+                }
             )
         }
-        
         rootView.onAvatarTapped = { [weak self] in
             self?.presentAvatarSourcePicker()
         }
@@ -73,10 +81,16 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
         rootView.onProfileMenuTapped = { [weak self] in
             guard let self = self else { return }
             let user = AuthAppServices.shared.authLogic.currentUser
+            
             ProfileNameEditFeature.present(
                 over: self,
                 firstName: user?.firstName,
-                lastName: user?.lastName
+                lastName: user?.lastName,
+                onUpdated: { [weak self] updatedUser in
+                    guard let self = self else { return }
+                    self.rootView.configure(with: updatedUser)
+                    self.updateGemCount(updatedUser.currentGemBalance)
+                }
             )
         }
         
@@ -121,8 +135,9 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
     
     private func reloadUser() {
         let user = AuthAppServices.shared.authLogic.currentUser
+        
         rootView.configure(with: user)
-        rootView.setAuthButtonMode(.login)
+        
         if let user = user {
             updateGemCount(user.currentGemBalance)
             rootView.setAuthButtonMode(.logout)
@@ -130,10 +145,6 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
             updateGemCount(0)
             rootView.setAuthButtonMode(.login)
         }
-        rootView.configure(with: user)
-        updateGemCount(user?.currentGemBalance ?? 0)
-        rootView.setAuthButtonMode(.logout)
-        
     }
     
     // MARK: - Public API for configuring sections
@@ -186,7 +197,23 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
     // MARK: - Login flow
     
     private func confirmLogin() {
-        showInfoAlert(title: "Login", message: "Login Tapped.")
+        let alert = UIAlertController(
+            title: "Logout",
+            message: "Are you sure you want to log in to your HonistAi profile?",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: nil))
+        alert.addAction(UIAlertAction(title: "Login", style: .default, handler: { [weak self] _ in
+            guard let self = self else {return }
+            let account = context.account
+            let _ = (account.postbox.loadedPeerWithId(account.peerId)
+             |> deliverOnMainQueue).start(next: { peer in
+                if let user = peer as? TelegramUser {
+                    self.performLogin(user)
+                }
+            })
+        }))
+        present(alert, animated: true, completion: nil)
     }
     
     // MARK: - Logout flow
@@ -221,6 +248,64 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
                 )
             }
         }
+    }
+    
+    public func performLogin(_ user: TelegramUser) {
+        // Adapt to HonistKit LoginRequest expected types
+        let telegramIdString = String(user.id.id._internalGetInt64Value())
+    //    let accessHashString: String? = user.accessHash.map { String($0.value) }
+        let usernameString: String? = user.username
+        // Prefer initializer with String parameters if available; otherwise fall back at compile time
+        #if canImport(HonistKit)
+            // Try the most common initializer signature: (telegramId: String, accessHash: String?, username: String?)
+        let loginReqModel = LoginRequest(telegramId: telegramIdString, username: usernameString, isBot: user.botInfo != nil ? true : false)
+        #else
+        let loginReqModel = LoginRequest(telegramId: telegramIdString, username: usernameString, isBot: user.botInfo != nil ? true : false)
+        #endif
+        Task {
+            do {
+                _ = try await AuthAppServices.shared.authLogic.login(request: loginReqModel)
+                // Call meWithAutoRefresh after a successful login
+                _ = try await AuthAppServices.shared.authLogic.meWithAutoRefresh()
+                self.reloadUser()
+                
+                #if DEBUG
+                print("[Auth] Honist login + meWithAutoRefresh succeeded for telegramId=\(user.id.id)")
+                #endif
+            } catch {
+                #if DEBUG
+                print("[Auth] Honist login failed: \(error)")
+                #endif
+            }
+        }
+        
+    #if DEBUG
+        let fullName: String = {
+            let first = user.firstName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let last = user.lastName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let combined = [first, last].filter { !$0.isEmpty }.joined(separator: " ")
+            return combined.isEmpty ? "—" : combined
+        }()
+        
+        let username = user.username ?? "—"
+        let phone = user.phone ?? "—"
+        let isBot = (user.botInfo != nil)
+        let isVerified = user.flags.contains(.isVerified)
+        let isPremium = user.flags.contains(.isPremium)
+        
+        print(
+            """
+            [Auth] User logged in
+            ├─ id: \(user.id.id)
+            ├─ phone: \(phone)
+            ├─ username: @\(username)
+            ├─ name: \(fullName)
+            ├─ verified: \(isVerified)
+            ├─ premium: \(isPremium)
+            └─ bot: \(isBot)
+            """
+        )
+    #endif
     }
     
     // MARK: - Avatar picking
@@ -316,6 +401,8 @@ extension HonistAiHomeViewController: UIImagePickerControllerDelegate, UINavigat
         
         let image = (info[.editedImage] ?? info[.originalImage]) as? UIImage
         if let image = image {
+            self.rootView.setLocalAvatar(image)
+            
             uploadSelectedAvatar(image)
         }
     }

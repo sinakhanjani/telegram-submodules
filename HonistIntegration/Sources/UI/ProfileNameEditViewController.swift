@@ -21,6 +21,8 @@ public final class ProfileNameEditViewController: UIViewController {
     private let initialFirstName: String?
     private let initialLastName: String?
     
+    public var onNameUpdated: ((UserDTO) -> Void)?
+
     private var isSubmitting = false {
         didSet { rootView.setLoading(isSubmitting) }
     }
@@ -183,12 +185,13 @@ public final class ProfileNameEditViewController: UIViewController {
         Task { [weak self] in
             guard let self = self else { return }
             do {
-                _ = try await self.logic.updateName(
+                let userDTO = try await self.logic.updateName(
                     firstName: trimmedFirst,
                     lastName: trimmedLast
                 )
                 
                 await MainActor.run {
+                    self.onNameUpdated?(userDTO)
                     self.dismiss(animated: true)
                 }
             } catch {

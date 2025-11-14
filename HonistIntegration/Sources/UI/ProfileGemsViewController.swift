@@ -11,6 +11,8 @@ public final class ProfileGemsViewController: HonistBaseViewController {
     
     private let profileLogic = ProfileLogic()
 
+    private var referrals: [ReferralDTO]?
+
     private enum OptionType {
         case watchAds
         case buyGems
@@ -78,14 +80,28 @@ public final class ProfileGemsViewController: HonistBaseViewController {
         self.displayNodeDidLoad()
     }
     
-    
     // MARK: - Lifecycle
     
     public override func displayNodeDidLoad() {
         super.displayNodeDidLoad()
         attachRootView(rootView)
+        fetchReferrals(page: 1, limit: 1000)
         setupTable()
         configureHeader()
+    }
+    
+    private func fetchReferrals(
+        page: Int,
+        limit: Int,
+    ) {
+        Task {
+            do {
+                let result = try await self.profileLogic.fetchReferrals(page: page, limit: limit)
+                self.referrals = result.items
+            } catch {
+                //
+            }
+        }
     }
     
     private func setupTable() {
@@ -145,12 +161,20 @@ extension ProfileGemsViewController: UITableViewDelegate {
         case .referral:
             // TODO: navigate to "Referral" screen
             Task { [weak self] in
-                let result = try? await self?.profileLogic.fetchReferrals(page: 1, limit: 1000)
-                let refList = result?.items ?? []
+                if let referrals = self?.referrals {
+                    guard let self else { return }
+                    
+                    let vc = ProfileReferralsViewController.init(context: self.context, referrals: referrals)
+                    self.navigationController?.pushViewController(vc, animated: true)
+                } else {
+                    let result = try? await self?.profileLogic.fetchReferrals(page: 1, limit: 1000)
+                    let refList = result?.items ?? []
 
-                guard let self else { return }
-                let vc = ProfileReferralsViewController.init(context: self.context, referrals: refList)
-                self.navigationController?.pushViewController(vc, animated: true)
+                    guard let self else { return }
+                    
+                    let vc = ProfileReferralsViewController.init(context: self.context, referrals: refList)
+                    self.navigationController?.pushViewController(vc, animated: true)
+                }
             }
             break
         }

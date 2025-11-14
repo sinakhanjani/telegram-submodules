@@ -4,12 +4,15 @@ swift_library(
     name = "HonistTelegramBridge",
     module_name = "HonistTelegramBridge",
     srcs = glob(["Sources/**/*.swift"]),
-    deps = [
-        "//submodules/HonistKit:HonistKit",
-        "//submodules/Display:Display",
-        "//submodules/TelegramPresentationData:TelegramPresentationData",
-        "//submodules/AccountContext:AccountContext",
-        "//submodules/AsyncDisplayKit:AsyncDisplayKit",
-    ],
+deps = [
+    "//submodules/HonistKit:HonistKit",
+    "//submodules/Display:Display",
+    "//submodules/TelegramPresentationData:TelegramPresentationData",
+    "//submodules/AsyncDisplayKit:AsyncDisplayKit",
+    "//submodules/AccountContext:AccountContext",
+    "//submodules/TelegramCore:TelegramCore",
+    "//submodules/Postbox:Postbox",
+    "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
+],
     visibility = ["//visibility:public"],
 )

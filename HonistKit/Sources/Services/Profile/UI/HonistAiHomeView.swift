@@ -266,6 +266,10 @@ public class HonistAiHomeView: UIView {
         }
     }
     
+    public func setLocalAvatar(_ image: UIImage) {
+        userProfileCard.setLocalAvatar(image)
+    }
+    
     // MARK: - Actions
     
     @objc
@@ -439,8 +443,25 @@ private final class UserProfileCardView: UIView {
         nameLabel.text = fullName
         
         idLabel.text = "ID : \(user.telegramId)"
-        print("photo small URL: \(user.photoSmall)")
-        avatarView.setImageWithUserPath(user.photoSmall ?? user.photoBig)
+        
+        if var path = user.photoSmall ?? user.photoBig {
+            let updatedAt = user.updatedAt
+            let ts = Int(updatedAt.timeIntervalSince1970)
+            if path.contains("?") {
+                path += "&v=\(ts)"
+            } else {
+                path += "?v=\(ts)"
+            }
+            print("final avatar path with version: \(path)")
+            avatarView.setImageWithUserPath(path)
+        } else {
+            avatarView.image = UIImage(named: "ic_profile_placeholder")
+        }
+    }
+    
+    
+    public func setLocalAvatar(_ image: UIImage) {
+        avatarView.image = image
     }
     
     // MARK: - Handlers

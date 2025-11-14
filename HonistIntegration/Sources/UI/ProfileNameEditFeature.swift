@@ -25,9 +25,14 @@ public enum ProfileNameEditFeature: HonistRoutable {
         firstName: String?,
         lastName: String?,
         animated: Bool = true,
+        onUpdated: ((UserDTO) -> Void)? = nil,
         completion: (() -> Void)? = nil
     ) {
-        let modal = makeRoot(firstName: firstName, lastName: lastName)
-        presenter.present(modal, animated: animated, completion: completion)
+        let vc = ProfileNameEditViewController(
+            firstName: firstName,
+            lastName: lastName
+        )
+        vc.onNameUpdated = onUpdated
+        presenter.present(vc, animated: animated, completion: completion)
     }
 }
