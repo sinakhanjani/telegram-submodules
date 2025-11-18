@@ -37,7 +37,9 @@ public final class ProfileReferralsViewController: HonistBaseViewController {
     override public func loadDisplayNode() {
         self.displayNode = ASDisplayNode(viewBlock: { [weak self] in
             let view = UIView()
-            view.backgroundColor = self?.presentationData.theme.list.plainBackgroundColor ?? .systemBackground
+            if let theme = self?.presentationData.theme {
+                view.backgroundColor = theme.rootController.navigationBar.blurredBackgroundColor
+            }
             return view
         })
         
@@ -47,7 +49,8 @@ public final class ProfileReferralsViewController: HonistBaseViewController {
     // MARK: - Lifecycle
     public override func displayNodeDidLoad() {
         super.displayNodeDidLoad()
-        attachRootView(rootView)
+        self.attachRootView(rootView)
+        self.updateBaseUI()
         bindActions()
         configureInitialData()
     }

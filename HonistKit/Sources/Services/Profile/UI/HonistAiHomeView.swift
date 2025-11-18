@@ -59,6 +59,9 @@ public class HonistAiHomeView: UIView {
     /// Called when an assistant item is tapped.
     public var onAssistantItemTapped: ((Int) -> Void)?
     
+    /// Called when Assistants header chevron is tapped.
+    public var onAssistantsHeaderTapped: (() -> Void)?
+    
     /// Called when a featured item row is tapped.
     public var onFeaturedItemTapped: ((Int) -> Void)?
     
@@ -153,11 +156,53 @@ public class HonistAiHomeView: UIView {
         contentStack.addArrangedSubview(metricsSection)
         contentStack.addArrangedSubview(aiChatButton)
         contentStack.addArrangedSubview(featuredSection)
-        contentStack.addArrangedSubview(authButton)
+        
+        // Insert auth button inside a container view with horizontal insets and fixed height
+        let authContainer = UIView()
+        authContainer.translatesAutoresizingMaskIntoConstraints = false
+        authContainer.addSubview(authButton)
+        
+        // Add top spacer inside authContainer
+        let authTopSpacer = UIView()
+        authTopSpacer.translatesAutoresizingMaskIntoConstraints = false
+        authContainer.addSubview(authTopSpacer)
+        
+        contentStack.addArrangedSubview(authContainer)
+        
+        NSLayoutConstraint.activate([
+            // Top spacer pinned to top with fixed height 16
+            authTopSpacer.topAnchor.constraint(equalTo: authContainer.topAnchor),
+            authTopSpacer.leadingAnchor.constraint(equalTo: authContainer.leadingAnchor),
+            authTopSpacer.trailingAnchor.constraint(equalTo: authContainer.trailingAnchor),
+            authTopSpacer.heightAnchor.constraint(equalToConstant: 64),
+
+            // Auth button below spacer with horizontal insets and fixed height
+            authButton.topAnchor.constraint(equalTo: authTopSpacer.bottomAnchor),
+            authButton.leadingAnchor.constraint(equalTo: authContainer.leadingAnchor, constant: 16),
+            authButton.trailingAnchor.constraint(equalTo: authContainer.trailingAnchor, constant: -16),
+            authButton.heightAnchor.constraint(equalToConstant: 48),
+
+            // Pin button to bottom of container
+            authButton.bottomAnchor.constraint(equalTo: authContainer.bottomAnchor)
+        ])
+        
+        // Bottom spacer to replace previous 80pt bottom inset
+        let bottomSpacer = UIView()
+        bottomSpacer.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.addArrangedSubview(bottomSpacer)
+        bottomSpacer.heightAnchor.constraint(equalToConstant: 80).isActive = true
+        
+        contentStack.setCustomSpacing(16, after: featuredSection)
         
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(scrollView)
         scrollView.addSubview(contentStack)
+        
+        // Removed floating authButton and scrollView insets for bottom
+        // Previously:
+        // addSubview(authButton)
+        // scrollView.contentInset.bottom = 96
+        // scrollView.verticalScrollIndicatorInsets.bottom = 96
     }
     
     private func setupLayout() {
@@ -165,15 +210,12 @@ public class HonistAiHomeView: UIView {
             scrollView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor),
             
             contentStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: DS.Spacing.md * 1.5),
             contentStack.leadingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.leadingAnchor, constant: DS.Spacing.md),
             contentStack.trailingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.trailingAnchor, constant: -DS.Spacing.md),
-            contentStack.bottomAnchor.constraint(
-                equalTo: scrollView.contentLayoutGuide.bottomAnchor,
-                constant: -(DS.Spacing.md + 96)
-            ),
+            contentStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
         ])
         
         // User profile card pinned to container
@@ -190,8 +232,15 @@ public class HonistAiHomeView: UIView {
         // Fixed height for assistants row (portrait + landscape safe)
         assistantsSection.heightAnchor.constraint(equalToConstant: 120).isActive = true
         
-        // Auth button full width height
-        authButton.heightAnchor.constraint(equalToConstant: 48).isActive = true
+        // Removed constraints for floating authButton
+        /*
+        NSLayoutConstraint.activate([
+            authButton.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 16),
+            authButton.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -16),
+            authButton.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -16),
+            authButton.heightAnchor.constraint(equalToConstant: 48)
+        ])
+        */
     }
     
     private func setupActions() {
@@ -220,6 +269,9 @@ public class HonistAiHomeView: UIView {
         // Assistants
         assistantsSection.onItemTapped = { [weak self] index in
             self?.onAssistantItemTapped?(index)
+        }
+        assistantsSection.onHeaderTapped = { [weak self] in
+            self?.onAssistantsHeaderTapped?()
         }
         
         // AI Chat button
@@ -534,6 +586,11 @@ public final class AssistantsSectionView: UIView {
     /// Called when an assistant item is tapped (index in current list).
     public var onItemTapped: ((Int) -> Void)?
     
+    public var onHeaderTapped: (() -> Void)?
+    
+    private let headerStack = UIStackView()
+    private let chevronView = UIImageView()
+    
     private let titleLabel = UILabel()
     private let scrollView = UIScrollView()
     private let stack = UIStackView()
@@ -557,6 +614,25 @@ public final class AssistantsSectionView: UIView {
         titleLabel.font = UIFont.systemFont(ofSize: 15, weight: .medium)
         titleLabel.textColor = DS.Color.text
         
+        chevronView.image = UIImage(systemName: "chevron.forward")
+        chevronView.tintColor = DS.Color.text
+        chevronView.contentMode = .scaleAspectFit
+        chevronView.setContentHuggingPriority(.required, for: .horizontal)
+        chevronView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        chevronView.translatesAutoresizingMaskIntoConstraints = false
+
+        headerStack.axis = .horizontal
+        headerStack.alignment = .center
+        headerStack.spacing = 8
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
+        headerStack.addArrangedSubview(titleLabel)
+        headerStack.addArrangedSubview(UIView()) // spacer
+        headerStack.addArrangedSubview(chevronView)
+        
+        let headerTap = UITapGestureRecognizer(target: self, action: #selector(handleHeaderTap))
+        headerStack.addGestureRecognizer(headerTap)
+        headerStack.isUserInteractionEnabled = true
+        
         scrollView.showsHorizontalScrollIndicator = false
         
         stack.axis = .horizontal
@@ -566,7 +642,7 @@ public final class AssistantsSectionView: UIView {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         stack.translatesAutoresizingMaskIntoConstraints = false
         
-        addSubview(titleLabel)
+        addSubview(headerStack)
         addSubview(scrollView)
         scrollView.addSubview(stack)
         
@@ -574,14 +650,14 @@ public final class AssistantsSectionView: UIView {
     }
     
     private func setupLayout() {
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: topAnchor),
-            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
-            titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor),
+            headerStack.topAnchor.constraint(equalTo: topAnchor),
+            headerStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            headerStack.trailingAnchor.constraint(equalTo: trailingAnchor),
             
-            scrollView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            scrollView.topAnchor.constraint(equalTo: headerStack.bottomAnchor, constant: 8),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -610,6 +686,11 @@ public final class AssistantsSectionView: UIView {
             
             view.widthAnchor.constraint(equalToConstant: 80).isActive = true
         }
+    }
+    
+    @objc
+    private func handleHeaderTap() {
+        onHeaderTapped?()
     }
 }
 
@@ -767,10 +848,11 @@ public final class MetricsSectionView: UIView {
 
 public final class FeaturedSectionView: UIView {
     
-    var onItemTapped: ((Int) -> Void)?
+    public var onItemTapped: ((Int) -> Void)?
     
     private let titleLabel = UILabel()
     private let stack = UIStackView()
+    private let emptyStateView = FeaturedEmptyStateView()
     
     private var items: [FeaturedItem] = []
     
@@ -798,6 +880,8 @@ public final class FeaturedSectionView: UIView {
         
         addSubview(titleLabel)
         addSubview(stack)
+        addSubview(emptyStateView)
+        emptyStateView.isHidden = true
         
         translatesAutoresizingMaskIntoConstraints = false
     }
@@ -810,16 +894,31 @@ public final class FeaturedSectionView: UIView {
             titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
             titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor),
             
-            stack.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            stack.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 48),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+        
+        NSLayoutConstraint.activate([
+            emptyStateView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 48),
+            emptyStateView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            emptyStateView.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 16),
+            emptyStateView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -16),
+            emptyStateView.bottomAnchor.constraint(equalTo: bottomAnchor) // Added constraint as requested
         ])
     }
     
     public func configure(items: [FeaturedItem]) {
         self.items = items
+        // Toggle empty state visibility
+        let isEmpty = items.isEmpty
+        emptyStateView.isHidden = !isEmpty
+        stack.isHidden = isEmpty
+        
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        guard !isEmpty else { return }
         
         for (index, item) in items.enumerated() {
             let row = FeaturedRowView()
@@ -831,6 +930,70 @@ public final class FeaturedSectionView: UIView {
             }
             stack.addArrangedSubview(row)
         }
+    }
+}
+
+public final class FeaturedEmptyStateView: UIView {
+    
+    private let imageView = UIImageView()
+    private let titleLabel = UILabel()
+//    private let subtitleLabel = UILabel()
+    private let vStack = UIStackView()
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        build()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        build()
+    }
+    
+    private func build() {
+        translatesAutoresizingMaskIntoConstraints = false
+        
+        // Icon
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.contentMode = .scaleAspectFit
+        imageView.image = UIImage(systemName: "person.3")
+        imageView.tintColor = DS.Color.text
+        
+        // Title
+        titleLabel.text = "No featured items"
+        titleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        titleLabel.textColor = DS.Color.text
+        titleLabel.textAlignment = .center
+        titleLabel.numberOfLines = 1
+        
+        // Subtitle
+//        subtitleLabel.text = "When something is featured, you'll see it here"
+//        subtitleLabel.font = .systemFont(ofSize: 12, weight: .regular)
+//        subtitleLabel.textColor = .secondaryLabel
+//        subtitleLabel.textAlignment = .center
+//        subtitleLabel.numberOfLines = 2
+        
+        // Stack
+        vStack.axis = .vertical
+        vStack.alignment = .center
+        vStack.spacing = 6
+        vStack.translatesAutoresizingMaskIntoConstraints = false
+        
+        vStack.addArrangedSubview(imageView)
+        vStack.addArrangedSubview(titleLabel)
+//        vStack.addArrangedSubview(subtitleLabel)
+        
+        addSubview(vStack)
+        
+        NSLayoutConstraint.activate([
+            vStack.centerXAnchor.constraint(equalTo: centerXAnchor),
+            vStack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            vStack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 16),
+            vStack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -16),
+            
+            imageView.heightAnchor.constraint(equalToConstant: 48),
+            imageView.widthAnchor.constraint(equalTo: imageView.heightAnchor)
+        ])
     }
 }
 
@@ -1024,3 +1187,4 @@ private final class AiChatButtonView: UIView {
         onTap?()
     }
 }
+

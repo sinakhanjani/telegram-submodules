@@ -1,6 +1,7 @@
 import Foundation
 import StoreKit
 
+@available(iOS 15.0, *)
 public final class PurchasesLogic {
     private let sk = StoreKitClient()
 

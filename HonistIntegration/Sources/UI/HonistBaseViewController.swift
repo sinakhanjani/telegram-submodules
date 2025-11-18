@@ -74,13 +74,20 @@ import AccountContext
     open override func loadDisplayNode() {
         self.displayNode = ASDisplayNode(viewBlock: { [weak self] in
             let view = UIView()
-            view.backgroundColor = self?.presentationData.theme.list.plainBackgroundColor
-                ?? .systemBackground
+            if let theme = self?.presentationData.theme {
+                view.backgroundColor = theme.rootController.navigationBar.blurredBackgroundColor
+            }
             return view
         })
         
         self.displayNodeDidLoad()
     }
+     
+     public func updateBaseUI() {
+         if let user = AuthAppServices.shared.authLogic.currentUser {
+             self.updateGemCount(user.currentGemBalance)
+         }
+     }
     
     // MARK: - Root view helper
     
@@ -145,7 +152,13 @@ import AccountContext
         
         self.gemNode = gemNode
         
-        let item = UIBarButtonItem(customDisplayNode: gemNode)
+        guard let item = UIBarButtonItem(customDisplayNode: gemNode) else {
+            // If we fail to create the bar button item, just skip wiring it.
+            return
+        }
+        // Wire up tap action for the right bar button item
+        item.target = self
+        item.action = #selector(didTapRightBarButton)
         self.navigationItem.rightBarButtonItem = item
     }
     
@@ -173,4 +186,23 @@ import AccountContext
             backgroundColor: bgColor
         )
     }
+    
+    // MARK: - Actions
+    
+    /// Called when the right navigation bar item is tapped.
+    /// Subclasses can override this to provide custom behavior.
+    @objc open func didTapRightBarButton() {
+        // Default implementation: no-op. Subclasses should override.
+        // You can also add logging here if needed.
+        PaymentsPaywallFeature.present(
+            over: self,
+            onConfirmSelection: { [weak self] product in
+                if let user = AuthAppServices.shared.authLogic.currentUser {
+                    guard let self = self else { return }
+                    self.updateGemCount(user.currentGemBalance)
+                }
+            }
+        )
+    }
 }
+

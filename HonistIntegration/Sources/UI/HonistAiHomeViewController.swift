@@ -30,13 +30,39 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
         
         // Tab bar is configured only here (not in the base)
         self.tabBarItem.title = "HonistAi"
-        let icon = UIImage.init(named: "tab_honistai_icon")!
-        self.tabBarItem.image = icon
-        self.tabBarItem.selectedImage = icon
+//        let icon = UIImage.init(named: "tab_honistai_icon")!
+//        self.tabBarItem.image = icon
+//        self.tabBarItem.selectedImage = icon
+        
+        let baseIcon = UIImage(named: "tab_honistai_icon")!
+
+        self.tabBarItem.image = baseIcon.withRenderingMode(.alwaysOriginal)
+
+        if #available(iOS 13.0, *) {
+            self.tabBarItem.selectedImage = baseIcon
+                .withTintColor(.systemBlue, renderingMode: .alwaysOriginal)
+        } else {
+            self.tabBarItem.selectedImage = baseIcon
+                .withRenderingMode(.alwaysOriginal)
+        }
     }
     
     required init(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    // MARK: - DisplayNode
+    
+    override public func loadDisplayNode() {
+        self.displayNode = ASDisplayNode(viewBlock: { [weak self] in
+            let view = UIView()
+            if let theme = self?.presentationData.theme {
+                view.backgroundColor = theme.rootController.navigationBar.blurredBackgroundColor
+            }
+            return view
+        })
+        
+        self.displayNodeDidLoad()
     }
     
     // MARK: - Lifecycle / UI setup
@@ -44,7 +70,6 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
     public override func displayNodeDidLoad() {
         super.displayNodeDidLoad()
         self.attachRootView(rootView)
-        
         bindActions()
         reloadUser()
         reloadAiHomeSections()
@@ -55,8 +80,18 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
     
     private func bindActions() {
         rootView.onUpgradeTapped = { [weak self] in
-            // TODO: navigate to premium screen
-            self?.showInfoAlert(title: "Premium", message: "Upgrade flow will be implemented later.")
+            guard let self = self else { return }
+
+            ProAccessPaywallFeature.present(
+                over: self,
+                onConfirmSelection: {  [weak self] product in
+                    if let user = AuthAppServices.shared.authLogic.currentUser {
+                        guard let self = self else { return }
+                        self.rootView.configure(with: user)
+                        self.updateGemCount(user.currentGemBalance)
+                    }
+                }
+            )
         }
         
         rootView.onProfileNameTapped = { [weak self] in
@@ -110,6 +145,11 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
         rootView.onAssistantItemTapped = { [weak self] index in
             // TODO: navigate to specific featured bot
             self?.showInfoAlert(title: "Assistant", message: "Tapped item at index \(index).")
+        }
+        
+        rootView.onAssistantsHeaderTapped = { [weak self] in
+            // TODO: navigate to specific featured bot
+            self?.showInfoAlert(title: "Assistant", message: "onAssistantsHeaderTapped")
         }
         
         rootView.onAiChatTapped = { [weak self] in
@@ -166,14 +206,14 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
                     ],
                     metrics: (gems: "\(currentGemBalance)", friends: "\(refList?.count ?? 0)"),
                     featured: [
-                        .init(title: "AlirezaGram",
-                              subtitle: "Are you ready to give change upside of the town hall building my necessary do..."),
-                        .init(title: "Face Swap Ai Bot",
-                              subtitle: "Search stories by hashtag. Tapping hashtags in story captions lets you bro..."),
-                        .init(title: "+5K People Have Won Bitcoin for...",
-                              subtitle: "1 BTC for 555$? 1ETH for 7543$? 1 Sol for 333? Who are you?"),
-                        .init(title: "Hyperlancer Ai",
-                              subtitle: "Complete tasks, upload a video and share it to get reward of us my into the d...")
+//                        .init(title: "AlirezaGram",
+//                              subtitle: "Are you ready to give change upside of the town hall building my necessary do..."),
+//                        .init(title: "Face Swap Ai Bot",
+//                              subtitle: "Search stories by hashtag. Tapping hashtags in story captions lets you bro..."),
+//                        .init(title: "+5K People Have Won Bitcoin for...",
+//                              subtitle: "1 BTC for 555$? 1ETH for 7543$? 1 Sol for 333? Who are you?"),
+//                        .init(title: "Hyperlancer Ai",
+//                              subtitle: "Complete tasks, upload a video and share it to get reward of us my into the d...")
                     ]
                 )
                 
@@ -198,7 +238,7 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
     
     private func confirmLogin() {
         let alert = UIAlertController(
-            title: "Logout",
+            title: "Login",
             message: "Are you sure you want to log in to your HonistAi profile?",
             preferredStyle: .alert
         )
