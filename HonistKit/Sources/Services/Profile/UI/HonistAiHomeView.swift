@@ -6,18 +6,20 @@ import HonistUIComponents
 import HonistService_Auth
 
 public struct AssistantItem {
-    let name: String
-    let imageName: String
+    public let id: String
+    public let name: String
+    public let imageName: String
     
-    public init(name: String, imageName: String) {
+    public init(id: String, name: String, imageName: String) {
+        self.id = id
         self.name = name
         self.imageName = imageName
     }
 }
 
 public struct FeaturedItem {
-    let title: String
-    let subtitle: String
+    public let title: String
+    public let subtitle: String
     
     public init(title: String, subtitle: String) {
         self.title = title
@@ -758,11 +760,9 @@ private final class AssistantItemView: UIView {
     }
     
     func configure(name: String, imageName: String) {
+        print(imageName, name)
         nameLabel.text = name
-        // Actual vector / image asset to be added later
-        if let img = UIImage(named: imageName) {
-            imageView.image = img
-        }
+        HonistImageLoader.shared.load(imageName, into: imageView)
     }
     
     @objc

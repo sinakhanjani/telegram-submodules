@@ -37,6 +37,11 @@ public final class PaymentsPaywallViewController: UIViewController {
     
     private var isProcessingPurchase = false
     
+    private var rootTopConstraint: NSLayoutConstraint?
+    // Horizontal constraints for rootView
+    private var rootLeadingConstraint: NSLayoutConstraint?
+    private var rootTrailingConstraint: NSLayoutConstraint?
+    
     // MARK: - Init
     
     public init(logic: PaymentsLogic = PaymentsLogic()) {
@@ -51,16 +56,47 @@ public final class PaymentsPaywallViewController: UIViewController {
     }
     
     // MARK: - Lifecycle
-    
-    public override func loadView() {
-        view = rootView
-    }
-    
     public override func viewDidLoad() {
         super.viewDidLoad()
-        
+        updateUI()
         setupCallbacks()
         fetchAndDisplayProducts()
+    }
+    
+    public override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Add horizontal inset when in landscape
+        let isLandscape = view.bounds.width > view.bounds.height
+        let horizontalInset: CGFloat = isLandscape ? 128 : 0
+        
+        rootLeadingConstraint?.constant = horizontalInset
+        rootTrailingConstraint?.constant = -horizontalInset
+    }
+    
+    private func updateUI() {
+        view.backgroundColor =  UIColor(
+            red: 27/255,
+            green: 35/255,
+            blue: 49/255,
+            alpha: 1.0
+        )
+        rootView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(rootView)
+        
+        let top = rootView.topAnchor.constraint(equalTo: view.topAnchor)
+        self.rootTopConstraint = top
+        
+        let leading = rootView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 0)
+        let trailing = rootView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 0)
+        self.rootLeadingConstraint = leading
+        self.rootTrailingConstraint = trailing
+        
+        NSLayoutConstraint.activate([
+            top,
+            leading,
+            trailing,
+            rootView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
     }
     
     // MARK: - Setup

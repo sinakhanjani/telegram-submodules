@@ -159,7 +159,8 @@ import AccountContext
         // Wire up tap action for the right bar button item
         item.target = self
         item.action = #selector(didTapRightBarButton)
-        self.navigationItem.rightBarButtonItem = item
+//        self.navigationItem.rightBarButtonItem = item
+        self.navigationItem.rightBarButtonItems = [item]
     }
     
     /// Updates the gem count displayed in the navigation bar

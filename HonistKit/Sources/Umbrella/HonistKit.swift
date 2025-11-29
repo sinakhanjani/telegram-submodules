@@ -9,5 +9,6 @@
 @_exported import HonistService_Auth
 @_exported import HonistService_Profile
 @_exported import HonistService_Payments
+@_exported import HonistService_Ai
 
 public enum HonistKitUmbrella {}

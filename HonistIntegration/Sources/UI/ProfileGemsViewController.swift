@@ -160,6 +160,15 @@ extension ProfileGemsViewController: UITableViewDelegate {
             break
         case .buyGems:
             // TODO: navigate to "Buy Gems" screen
+            PaymentsPaywallFeature.present(
+                over: self,
+                onConfirmSelection: { [weak self] product in
+                    if let user = AuthAppServices.shared.authLogic.currentUser {
+                        guard let self = self else { return }
+                        self.updateGemCount(user.currentGemBalance)
+                    }
+                }
+            )
             break
         case .referral:
             // TODO: navigate to "Referral" screen

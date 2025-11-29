@@ -343,13 +343,8 @@ public final class ProAccessPaywallView: UIView {
             row.heightAnchor.constraint(greaterThanOrEqualToConstant: 74).isActive = true
 
             let isSelected = (product.id == selectedProductId)
-            // منطق Best Offer: محصول popular یا اولین محصول در صورت نبودن popular
-            let isBestOffer: Bool
-            if product.isPopular {
-                isBestOffer = true
-            } else {
-                isBestOffer = (index == 0 && !products.contains(where: { $0.isPopular }))
-            }
+
+            let isBestOffer = product.isPopular
 
             row.configure(
                 with: product,

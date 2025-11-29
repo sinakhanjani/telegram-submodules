@@ -64,10 +64,16 @@ public enum PaymentsPaywallFeature: HonistRoutable {
 
             presenter.present(vc, animated: animated, completion: completion)
         } else {
-            // Fallback presentation for iOS versions earlier than 15.0
-            let fallback = UIViewController()
-            fallback.view.backgroundColor = .systemBackground
-            presenter.present(fallback, animated: animated, completion: completion)
+            let alert = UIAlertController(
+                title: "iOS 15 Required",
+                message: "This feature requires at least iOS 15 to run.",
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(
+                UIAlertAction(title: "OK", style: .default, handler: nil)
+            )
+            presenter.present(alert, animated: true, completion: completion)
         }
     }
 }

@@ -137,6 +137,23 @@ swift_library(
     visibility = ["//visibility:public"],
 )
 
+swift_library(
+    name = "HonistService_Ai",
+    module_name = "HonistService_Ai",
+    srcs = glob(["Sources/Services/Ai/**/*.swift"]),
+    deps = [
+        ":HonistFoundation",
+        ":HonistModels",
+        ":HonistNetworking",
+        ":HonistStorage",
+        ":HonistCore",
+        ":HonistUIComponents",
+        ":HonistDesignSystem",
+        ":HonistRouting",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 # ======================================================
 # 🧩 Umbrella Module
 # ======================================================
@@ -157,6 +174,7 @@ swift_library(
         ":HonistService_Auth",
         ":HonistService_Profile",
         ":HonistService_Payments",
+        ":HonistService_Ai",
     ],
     visibility = ["//visibility:public"],
 )

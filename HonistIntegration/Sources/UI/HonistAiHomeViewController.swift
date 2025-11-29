@@ -15,9 +15,11 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
     // For avatar selection
     private let imagePicker = UIImagePickerController()
     private let profileLogic = ProfileLogic()
-        
+    private let aiLogic = AiLogic()
+
     private var refList: [ReferralDTO]?
-    
+    private var assistantItems: [AssistantItem] = []
+
     // MARK: - Init
     
     public init(context: AccountContext) {
@@ -144,17 +146,27 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
         
         rootView.onAssistantItemTapped = { [weak self] index in
             // TODO: navigate to specific featured bot
-            self?.showInfoAlert(title: "Assistant", message: "Tapped item at index \(index).")
+            guard let self = self else { return }
+            let assistant = self.assistantItems[index]
+            let vc = AiConversationsViewController.init(context: self.context, assistantId: assistant.id, assistantTitle: assistant.name)
+            self.navigationController?.pushViewController(vc, animated: true)
         }
         
         rootView.onAssistantsHeaderTapped = { [weak self] in
             // TODO: navigate to specific featured bot
-            self?.showInfoAlert(title: "Assistant", message: "onAssistantsHeaderTapped")
+            guard let self = self else { return }
+            let vc = AiAssistantsViewController.init(context: self.context)
+            self.navigationController?.pushViewController(vc, animated: true)
         }
         
         rootView.onAiChatTapped = { [weak self] in
-            // TODO: navigate to AI chat screen
-            self?.showInfoAlert(title: "AI Chat", message: "AI Chat screen will be implemented later.")
+            guard let self = self else {return }
+            
+            if self.assistantItems.count > 0 {
+                let assistant = self.assistantItems[0]
+                let vc = AiConversationsViewController.init(context: self.context, assistantId: assistant.id, assistantTitle: assistant.name)
+                self.navigationController?.pushViewController(vc, animated: true)
+            }
         }
         
         rootView.onFeaturedItemTapped = { [weak self] index in
@@ -194,16 +206,35 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
         Task { @MainActor in
             do {
                 let result = try? await profileLogic.fetchReferrals(page: 1, limit: 1000)
+                let loadedAssistants = (try? await aiLogic.loadAssistants()) ?? []
                 let refList = result?.items
                 let currentGemBalance = AuthAppServices.shared.authLogic.currentUser?.currentGemBalance ?? 0
+                let assistantItems: [AssistantItem] = loadedAssistants.map { model in
+                    // Sanitize name: remove the word "assistant" (case-insensitive) and trim spaces
+                    let sanitizedName: String = {
+                        let lower = model.name.lowercased()
+                        if lower.contains("assistant") {
+                            // Replace occurrences of "assistant" ignoring case
+                            let pattern = "(?i)assistant"
+                            if let regex = try? NSRegularExpression(pattern: pattern) {
+                                let range = NSRange(location: 0, length: (model.name as NSString).length)
+                                let result = regex.stringByReplacingMatches(in: model.name, options: [], range: range, withTemplate: "")
+                                return result.replacingOccurrences(of: "  ", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+                            }
+                        }
+                        return model.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }()
+                    return AssistantItem(
+                        id: model.id,
+                        name: sanitizedName,
+                        imageName: model.avatarUrl ?? "ic_assistant_general"
+                    )
+                }
+                
+                self.assistantItems = assistantItems
+                
                 let sectionsData = HomeSectionsData(
-                    assistants: [
-                        .init(name: "General", imageName: "ic_assistant_general"),
-                        .init(name: "Coding Expert", imageName: "ic_assistant_coding"),
-                        .init(name: "Teacher", imageName: "ic_assistant_teacher"),
-                        .init(name: "Tech Expert", imageName: "ic_assistant_tech"),
-                        .init(name: "Fitness", imageName: "ic_assistant_fitness")
-                    ],
+                    assistants: assistantItems,
                     metrics: (gems: "\(currentGemBalance)", friends: "\(refList?.count ?? 0)"),
                     featured: [
 //                        .init(title: "AlirezaGram",
