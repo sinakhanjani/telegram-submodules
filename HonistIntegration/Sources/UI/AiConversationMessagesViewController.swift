@@ -75,15 +75,44 @@ public final class AiConversationsViewController: HonistBaseViewController {
 
         self.attachRootView(rootView)
         self.updateBaseUI()
-        self.setupNavigationItems()
+
+        // Setup right bar buttons: [compose, gem]
+        var rightItems: [UIBarButtonItem] = []
+
+        if let gemItem = makeGemBarButtonItem() {
+            rightItems.append(gemItem)
+        }
+        if let composeItem = makeComposeBarButtonItem() {
+            rightItems.append(composeItem)
+        }
+        if !rightItems.isEmpty {
+            self.navigationItem.rightBarButtonItems = rightItems
+        }
 
         configureTableView()
         configureEmptyState()
 
         loadConversations()
     }
-
+    
     // MARK: - Setup
+    
+    /// Builds a compose bar button item using a customDisplayNode
+    private func makeComposeBarButtonItem() -> UIBarButtonItem? {
+        let node = ASDisplayNode { [weak self] in
+            let button = UIButton(type: .system)
+            button.setImage(UIImage(systemName: "square.and.pencil"), for: .normal)
+            button.tintColor = DS.Color.text
+            button.addTarget(self, action: #selector(AiConversationsViewController.didTapCompose), for: .touchUpInside)
+            return button
+        }
+        node.style.preferredSize = CGSize(width: 30, height: 30)
+
+        guard let item = UIBarButtonItem(customDisplayNode: node) else {
+            return nil
+        }
+        return item
+    }
 
     private func configureTableView() {
         let tv = rootView.tableView
@@ -104,29 +133,6 @@ public final class AiConversationsViewController: HonistBaseViewController {
             action: #selector(didTapEmptyStateButton),
             for: .touchUpInside
         )
-    }
-
-    // MARK: - Navigation Items
-
-    private func setupNavigationItems() {
-        // System 'new message' icon (compose)
-        let composeItem = UIBarButtonItem(barButtonSystemItem: .compose, target: self, action: #selector(didTapCompose))
-
-        // Ensure compose is the first (rightmost) item.
-        // If there are existing rightBarButtonItems from base or elsewhere, prepend compose.
-        var currentItems = self.navigationItem.rightBarButtonItems ?? []
-        // Avoid duplicates if setup is called multiple times
-        if !currentItems.contains(where: { ($0.target === self) && ($0.action == #selector(didTapCompose)) }) {
-            currentItems.insert(composeItem, at: 0)
-        }
-        self.navigationItem.rightBarButtonItems = currentItems
-    }
-
-    @objc
-    private func didTapCompose() {
-        // Placeholder for future implementation
-        // e.g., trigger starting a new conversation flow
-        onStartNewChat?()
     }
 
     // MARK: - Data loading
@@ -159,6 +165,13 @@ public final class AiConversationsViewController: HonistBaseViewController {
     }
 
     // MARK: - Actions
+    
+    @objc
+    private func didTapCompose() {
+        // Placeholder for future implementation
+        // e.g., trigger starting a new conversation flow
+        onStartNewChat?()
+    }
 
     @objc
     private func didTapEmptyStateButton() {
@@ -250,6 +263,83 @@ extension AiConversationsViewController: UITableViewDelegate {
     public func tableView(_ tableView: UITableView, shouldHighlightRowAt indexPath: IndexPath) -> Bool {
         // Disable touch-down highlight effect
         return false
+    }
+
+    public func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        guard indexPath.row < filteredConversations.count else { return nil }
+        let convo = filteredConversations[indexPath.row]
+
+        let deleteAction = UIContextualAction(style: .destructive, title: nil) { [weak self] _, _, completion in
+            guard let self else { completion(false); return }
+
+            // Ask for confirmation
+            let alert = UIAlertController(title: nil, message: NSLocalizedString("Are you sure you want to delete this conversation?", comment: "Delete confirmation"), preferredStyle: .actionSheet)
+
+            let confirm = UIAlertAction(title: NSLocalizedString("Delete", comment: "Delete"), style: .destructive) { [weak self] _ in
+                guard let self else { completion(false); return }
+
+                // Optimistically disable interaction for the row
+                if let cell = tableView.cellForRow(at: indexPath) {
+                    cell.isUserInteractionEnabled = false
+                }
+
+                Task { [weak self] in
+                    guard let self else { completion(false); return }
+                    do {
+                        try await self.logic.deleteConversation(conversationId: convo.id)
+
+                        // Update data sources
+                        if let idxAll = self.allConversations.firstIndex(where: { $0.id == convo.id }) {
+                            self.allConversations.remove(at: idxAll)
+                        }
+                        // Rebuild filtered list from allConversations to stay consistent
+                        self.filteredConversations = self.allConversations.filter { $0.assistantId == self.assistantId }
+
+                        await MainActor.run {
+                            // Delete the row if still visible
+                            if indexPath.row < tableView.numberOfRows(inSection: indexPath.section) {
+                                tableView.performBatchUpdates({
+                                    tableView.deleteRows(at: [indexPath], with: .automatic)
+                                }, completion: { _ in })
+                            } else {
+                                tableView.reloadData()
+                            }
+                            let isEmpty = self.filteredConversations.isEmpty
+                            self.rootView.setEmptyStateVisible(isEmpty)
+                            completion(true)
+                        }
+                    } catch {
+                        // TODO: show error UI if needed
+                        await MainActor.run {
+                            if let cell = tableView.cellForRow(at: indexPath) {
+                                cell.isUserInteractionEnabled = true
+                            }
+                            completion(false)
+                        }
+                    }
+                }
+            }
+
+            let cancel = UIAlertAction(title: NSLocalizedString("Cancel", comment: "Cancel"), style: .cancel) { _ in
+                completion(false)
+            }
+
+            alert.addAction(confirm)
+            alert.addAction(cancel)
+
+            // For iPad actionSheet popover anchor
+            if let popover = alert.popoverPresentationController, let cell = tableView.cellForRow(at: indexPath) {
+                popover.sourceView = cell
+                popover.sourceRect = cell.bounds
+            }
+
+            self.present(alert, animated: true)
+        }
+        deleteAction.image = UIImage(systemName: "trash")
+
+        let config = UISwipeActionsConfiguration(actions: [deleteAction])
+        config.performsFirstActionWithFullSwipe = true
+        return config
     }
 
     public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {

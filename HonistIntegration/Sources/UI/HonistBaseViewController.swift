@@ -1,12 +1,13 @@
 import UIKit
 import HonistKit
+import HonistDesignSystem
 import Display
 import AsyncDisplayKit
 import SwiftSignalKit
 import TelegramPresentationData
 import AccountContext
 
- open class HonistBaseViewController: ViewController {
+open class HonistBaseViewController: ViewController {
     
     public let context: AccountContext
     public private(set) var presentationData: PresentationData
@@ -83,11 +84,11 @@ import AccountContext
         self.displayNodeDidLoad()
     }
      
-     public func updateBaseUI() {
-         if let user = AuthAppServices.shared.authLogic.currentUser {
-             self.updateGemCount(user.currentGemBalance)
-         }
-     }
+    public func updateBaseUI() {
+        if let user = AuthAppServices.shared.authLogic.currentUser {
+            self.updateGemCount(user.currentGemBalance)
+        }
+    }
     
     // MARK: - Root view helper
     
@@ -152,15 +153,60 @@ import AccountContext
         
         self.gemNode = gemNode
         
+        // Default behavior: show only gem badge as right bar button
+        self.setRightBarButtonsToGemOnly()
+    }
+    
+    /// Builds a UIBarButtonItem for the gem badge using customDisplayNode
+    public func makeGemBarButtonItem() -> UIBarButtonItem? {
+        guard let gemNode = self.gemNode else { return nil }
         guard let item = UIBarButtonItem(customDisplayNode: gemNode) else {
-            // If we fail to create the bar button item, just skip wiring it.
-            return
+            return nil
         }
-        // Wire up tap action for the right bar button item
         item.target = self
         item.action = #selector(didTapRightBarButton)
-//        self.navigationItem.rightBarButtonItem = item
+        return item
+    }
+    
+    /// Sets navigation right bar button to show only the gem badge.
+    public func setRightBarButtonsToGemOnly() {
+        guard let item = makeGemBarButtonItem() else { return }
         self.navigationItem.rightBarButtonItems = [item]
+    }
+    
+    /// Sets navigation right bar button to two items: [compose, gem].
+    /// Both items are backed by ASDisplayNode to work with Telegram's custom nav bar.
+    /// - Parameters:
+    ///   - composeTarget: Target for compose button.
+    ///   - composeAction: Selector called when compose button is tapped.
+    public func setRightBarButtonsToGemAndCompose(
+        composeTarget: Any?,
+        composeAction: Selector
+    ) {
+        guard let gemItem = makeGemBarButtonItem() else { return }
+        
+        // Compose node wrapping a UIButton
+        let composeNode = ASDisplayNode {
+            let button = UIButton(type: .system)
+            button.setImage(UIImage(systemName: "square.and.pencil"), for: .normal)
+            button.tintColor = DS.Color.text
+
+            if let target = composeTarget {
+                button.addTarget(target, action: composeAction, for: .touchUpInside)
+            }
+
+            return button
+        }
+        composeNode.style.preferredSize = CGSize(width: 30.0, height: 30.0)
+        
+        guard let composeItem = UIBarButtonItem(customDisplayNode: composeNode) else {
+            // Fallback: keep only gem if compose cannot be created
+            self.navigationItem.rightBarButtonItems = [gemItem]
+            return
+        }
+        
+        // Order: [compose, gem] → compose rightmost, gem سمت چپش
+        self.navigationItem.rightBarButtonItems = [composeItem, gemItem]
     }
     
     /// Updates the gem count displayed in the navigation bar
@@ -193,17 +239,14 @@ import AccountContext
     /// Called when the right navigation bar item is tapped.
     /// Subclasses can override this to provide custom behavior.
     @objc open func didTapRightBarButton() {
-        // Default implementation: no-op. Subclasses should override.
-        // You can also add logging here if needed.
+        // Default implementation: open payments paywall
         PaymentsPaywallFeature.present(
             over: self,
-            onConfirmSelection: { [weak self] product in
+            onConfirmSelection: { [weak self] _ in
                 if let user = AuthAppServices.shared.authLogic.currentUser {
-                    guard let self = self else { return }
-                    self.updateGemCount(user.currentGemBalance)
+                    self?.updateGemCount(user.currentGemBalance)
                 }
             }
         )
     }
 }
-
