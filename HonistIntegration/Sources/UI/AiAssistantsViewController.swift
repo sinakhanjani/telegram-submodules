@@ -353,12 +353,18 @@ extension AiAssistantsViewController: UITableViewDelegate {
         case .assistants:
             guard indexPath.row < assistants.count else { return }
             let assistant = assistants[indexPath.row]
+            let vc = AiConversationsViewController.init(context: self.context, assistantId: assistant.id, assistantTitle: assistant.name)
+            self.navigationController?.pushViewController(vc, animated: true)
+            
             onAssistantSelected?(assistant)
             // در آینده اینجا navigation به صفحه چت یا جزئیات assistant را اضافه می‌کنیم.
 
         case .popular:
             guard indexPath.row < visiblePrompts.count else { return }
             let prompt = visiblePrompts[indexPath.row]
+            let vc = AiChatViewController.init(context: self.context, assistantId: nil, conversationId: nil, promptId: prompt.id, assistantName: prompt.assistant.name)
+            self.navigationController?.pushViewController(vc, animated: true)
+
             onPromptSelected?(prompt)
             // در آینده اینجا navigation به صفحه چت prompt-based را اضافه می‌کنیم.
         }

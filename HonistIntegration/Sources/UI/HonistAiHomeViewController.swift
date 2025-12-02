@@ -191,7 +191,7 @@ public final class HonistAiHomeViewController: HonistBaseViewController {
         rootView.configure(with: user)
         
         if let user = user {
-            updateGemCount(user.currentGemBalance)
+            self.updateGemCount(user.currentGemBalance)
             rootView.setAuthButtonMode(.logout)
         } else {
             updateGemCount(0)

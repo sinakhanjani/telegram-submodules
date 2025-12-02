@@ -91,8 +91,13 @@ public final class AiConversationsViewController: HonistBaseViewController {
 
         configureTableView()
         configureEmptyState()
+    }
 
-        loadConversations()
+    public override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Refresh conversations each time the view appears
+        self.loadConversations()
+        self.reloadGems()
     }
     
     // MARK: - Setup
@@ -136,6 +141,20 @@ public final class AiConversationsViewController: HonistBaseViewController {
     }
 
     // MARK: - Data loading
+    
+    private func reloadGems() {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let user = try await AuthAppServices.shared.authLogic.meWithAutoRefresh()
+                await MainActor.run {
+                    self.updateGemCount(user.currentGemBalance)
+                }
+            } catch {
+                print("⚠️ meWithAutoRefresh failed:", error)
+            }
+        }
+    }
 
     private func loadConversations(page: Int = 1, limit: Int = 50) {
         Task { [weak self] in
@@ -170,12 +189,15 @@ public final class AiConversationsViewController: HonistBaseViewController {
     private func didTapCompose() {
         // Placeholder for future implementation
         // e.g., trigger starting a new conversation flow
+        let vc = AiChatViewController.init(context: self.context, assistantId: self.assistantId, conversationId: nil, promptId: nil, assistantName: self.assistantTitle)
+        self.navigationController?.pushViewController(vc, animated: true)
         onStartNewChat?()
     }
 
     @objc
     private func didTapEmptyStateButton() {
-        //
+        let vc = AiChatViewController.init(context: self.context, assistantId: self.assistantId, conversationId: nil, promptId: nil, assistantName: self.assistantTitle)
+        self.navigationController?.pushViewController(vc, animated: true)
         onStartNewChat?()
     }
 
@@ -250,7 +272,7 @@ extension AiConversationsViewController: UITableViewDataSource {
 
         let conversation = filteredConversations[indexPath.row]
         let vm = makeViewModel(for: conversation)
-        cell.selectionStyle = .none
+        cell.selectionStyle = .default
         cell.configure(with: vm)
         return cell
     }
@@ -262,7 +284,7 @@ extension AiConversationsViewController: UITableViewDelegate {
     
     public func tableView(_ tableView: UITableView, shouldHighlightRowAt indexPath: IndexPath) -> Bool {
         // Disable touch-down highlight effect
-        return false
+        return true
     }
 
     public func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
@@ -346,6 +368,9 @@ extension AiConversationsViewController: UITableViewDelegate {
         tableView.deselectRow(at: indexPath, animated: true)
         guard indexPath.row < filteredConversations.count else { return }
         let convo = filteredConversations[indexPath.row]
+        let vc = AiChatViewController.init(context: self.context, assistantId: self.assistantId, conversationId: convo.id, promptId: nil, assistantName: self.assistantTitle)
+        self.navigationController?.pushViewController(vc, animated: true)
+        
         onConversationSelected?(convo)
     }
 }
